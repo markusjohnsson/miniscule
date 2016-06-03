@@ -8,11 +8,11 @@ export default class Mini<T> {
     
     static from<T>(table: Type<T>, fields: string[]) { return new Table<T>(table, fields); }
     
-    select(fields: string[]) { return new Select(this, fields); }
+    select<TResult>(fields: string[]) { return new Select<T, TResult>(this, fields); }
     
-    where(predicate: string) { return new Where(this, predicate); }
+    where(predicate: string) { return new Where<T>(this, predicate); }
     
-    join<T2>(other: Mini<T2>, predicate: string) { return new Join(this, other, predicate); }
+    join<T2>(other: Mini<T2>, predicate: string) { return new Join<T, T2>(this, other, predicate); }
     
     toSqlString(depth: number, context: { tables: number }) {
         return "not implemented"
