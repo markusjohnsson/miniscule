@@ -1,13 +1,18 @@
-export default class Mini {
-    constructor(public inner: Mini, public fields: string[]) { }
+
+export interface Type<T> {
+    new () : T;
+}
+
+export default class Mini<T> {
+    constructor(public inner: Mini<any>, public fields: string[]) { }
     
-    static from(table: string, fields: string[]) { return new Table(table, fields); }
+    static from<T>(table: string, fields: string[]) { return new Table<T>(table, fields); }
     
     select(fields: string[]) { return new Select(this, fields); }
     
     where(predicate: string) { return new Where(this, predicate); }
     
-    join(other: Mini, predicate: string) { return new Join(this, other, predicate); }
+    join<T2>(other: Mini<T2>, predicate: string) { return new Join(this, other, predicate); }
     
     toSqlString(depth: number, context: { tables: number }) {
         return "not implemented"
@@ -35,8 +40,8 @@ export default class Mini {
     }
 }
 
-export class Select extends Mini {
-    constructor(inner: Mini, fields: string[]) { super(inner, fields); }
+export class Select<T, TResult> extends Mini<TResult> {
+    constructor(inner: Mini<T>, fields: string[]) { super(inner, fields); }
     
     toSqlString(depth: number, context: { tables: number }) {
         return this.wrapTable(
@@ -44,8 +49,8 @@ export class Select extends Mini {
     }
 }
 
-export class Where extends Mini {
-    constructor(inner: Mini, public predicate: string) { super(inner, inner.fields); }
+export class Where<T> extends Mini<T> {
+    constructor(inner: Mini<T>, public predicate: string) { super(inner, inner.fields); }
     toSqlString(depth: number, context: { tables: number }) {
         return this.wrapTable(
             this.getSelectFrom() + this.inner.toSqlString(depth + 1, context) +
@@ -53,8 +58,8 @@ export class Where extends Mini {
     }
 }
 
-export class Join extends Mini {
-    constructor(inner: Mini, private other: Mini, private predicate: string) { super(inner, inner.fields.concat(other.fields)); }
+export class Join<T1, T2> extends Mini<T1 & T2> {
+    constructor(inner: Mini<T1>, private other: Mini<T2>, private predicate: string) { super(inner, inner.fields.concat(other.fields)); }
     toSqlString(depth: number, context: { tables: number }) {
         return this.wrapTable(
             this.getSelectFrom() + this.inner.toSqlString(depth + 1, context) +
@@ -62,7 +67,7 @@ export class Join extends Mini {
     }
 }
 
-export class Table extends Mini {
+export class Table<T> extends Mini<T> {
     constructor(private tableName: string, fields: string[]) { super(null, fields); }
     toSqlString(depth: number, context: { tables: number }) {
         return this.wrapTable(this.getSelectFrom() + this.tableName, depth, context);

@@ -8,3 +8,4 @@ console.log(Mini
     .where("ship_id < 500")
     .select(["prefix"])
     .toString())
+    ;
