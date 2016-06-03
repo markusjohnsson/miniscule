@@ -6,7 +6,7 @@ export interface Type<T> {
 export default class Mini<T> {
     constructor(public inner: Mini<any>, public fields: string[]) { }
     
-    static from<T>(table: string, fields: string[]) { return new Table<T>(table, fields); }
+    static from<T>(table: Type<T>, fields: string[]) { return new Table<T>(table, fields); }
     
     select(fields: string[]) { return new Select(this, fields); }
     
@@ -68,9 +68,10 @@ export class Join<T1, T2> extends Mini<T1 & T2> {
 }
 
 export class Table<T> extends Mini<T> {
-    constructor(private tableName: string, fields: string[]) { super(null, fields); }
+    constructor(private tableType: Type<T>, fields: string[]) { super(null, fields); }
     toSqlString(depth: number, context: { tables: number }) {
-        return this.wrapTable(this.getSelectFrom() + this.tableName, depth, context);
+        let tableName = (<any>this.tableType).name; 
+        return this.wrapTable(this.getSelectFrom() + tableName, depth, context);
     }
 }
 

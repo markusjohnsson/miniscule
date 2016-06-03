@@ -77,12 +77,13 @@ var Join = (function (_super) {
 exports.Join = Join;
 var Table = (function (_super) {
     __extends(Table, _super);
-    function Table(tableName, fields) {
+    function Table(tableType, fields) {
         _super.call(this, null, fields);
-        this.tableName = tableName;
+        this.tableType = tableType;
     }
     Table.prototype.toSqlString = function (depth, context) {
-        return this.wrapTable(this.getSelectFrom() + this.tableName, depth, context);
+        var tableName = this.tableType.name;
+        return this.wrapTable(this.getSelectFrom() + tableName, depth, context);
     };
     return Table;
 })(Mini);
