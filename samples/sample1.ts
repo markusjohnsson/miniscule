@@ -2,18 +2,29 @@
 import Mini from "../miniscule"; 
 
 class shipadress {
-    
+    ship_id: number = 0;
+    address_id: number = 0;
 }
 
 class address {
-    
+    address_id: number = 0;
+    prefix: string = "";
 }
 
+console.log(Mini.from(shipadress).toString());
+console.log(Mini.from(address).toString());
+console.log(Mini.from(address).where("ship_id < 500").toString());
+
+
 console.log(Mini
-    .from(shipadress, ["ship_id", "address_id as s_address_id"])
-    .join(Mini.from(address, ["address_id", "prefix"]), "s_address_id = address_id")
+    .from(shipadress)
+    .join(
+        Mini.from(address), 
+        s => s.address_id,
+        s => s.address_id, 
+        (s, a) => ({ ship_id: s.ship_id, prefix: a.prefix }))
     .where("ship_id > 123")
     .where("ship_id < 500")
-    .select(["prefix"])
+    .select(s => s.prefix)
     .toString())
     ;
