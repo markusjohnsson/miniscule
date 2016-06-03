@@ -10,13 +10,7 @@ var Mini = (function () {
     }
     Mini.from = function (table, fields) { return new Table(table, fields); };
     Mini.prototype.select = function (fields) { return new Select(this, fields); };
-    Mini.prototype.where = function (predicate) {
-        var self = this; // workaround to allow type guard, fixed in TypeScript 2.0
-        if (self instanceof Where) {
-            return new Where(this.inner, "(" + self.predicate + ") and (" + predicate + ")");
-        }
-        return new Where(this, predicate);
-    };
+    Mini.prototype.where = function (predicate) { return new Where(this, predicate); };
     Mini.prototype.join = function (other, predicate) { return new Join(this, other, predicate); };
     Mini.prototype.toSqlString = function (depth, context) {
         return "not implemented";
@@ -33,6 +27,9 @@ var Mini = (function () {
             return "\n" + indent + "(" + str + ") " + this.getTableId(context) + "\n" + indent;
         }
     };
+    Mini.prototype.getSelectFrom = function () {
+        return "select " + this.fields.join(",") + " from ";
+    };
     Mini.prototype.toString = function () {
         return this.toSqlString(0, { tables: 0 });
     };
@@ -46,7 +43,7 @@ var Select = (function (_super) {
         _super.call(this, inner, fields);
     }
     Select.prototype.toSqlString = function (depth, context) {
-        return this.wrapTable("select " + this.fields.join(",") + " from " + this.inner.toSqlString(depth + 1, context), depth, context);
+        return this.wrapTable(this.getSelectFrom() + this.inner.toSqlString(depth + 1, context), depth, context);
     };
     return Select;
 })(Mini);
@@ -58,7 +55,7 @@ var Where = (function (_super) {
         this.predicate = predicate;
     }
     Where.prototype.toSqlString = function (depth, context) {
-        return this.wrapTable("select " + this.fields.join(",") + " from " + this.inner.toSqlString(depth + 1, context) +
+        return this.wrapTable(this.getSelectFrom() + this.inner.toSqlString(depth + 1, context) +
             " where " + this.predicate, depth, context);
     };
     return Where;
@@ -72,7 +69,7 @@ var Join = (function (_super) {
         this.predicate = predicate;
     }
     Join.prototype.toSqlString = function (depth, context) {
-        return this.wrapTable("select " + this.fields.join(",") + " from " + this.inner.toSqlString(depth + 1, context) +
+        return this.wrapTable(this.getSelectFrom() + this.inner.toSqlString(depth + 1, context) +
             " join " + this.other.toSqlString(depth + 1, context) + " on " + this.predicate, depth, context);
     };
     return Join;
@@ -85,7 +82,7 @@ var Table = (function (_super) {
         this.tableName = tableName;
     }
     Table.prototype.toSqlString = function (depth, context) {
-        return this.wrapTable("select " + this.fields.join(",") + " from " + this.tableName, depth, context);
+        return this.wrapTable(this.getSelectFrom() + this.tableName, depth, context);
     };
     return Table;
 })(Mini);

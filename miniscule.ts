@@ -5,15 +5,7 @@ export default class Mini {
     
     select(fields: string[]) { return new Select(this, fields); }
     
-    where(predicate: string) {
-        let self = <Mini>this; // workaround to allow type guard, fixed in TypeScript 2.0
-        
-        if (self instanceof Where) {
-            return new Where(this.inner, "(" + self.predicate + ") and (" + predicate + ")");
-        }
-
-        return new Where(this, predicate);
-    }
+    where(predicate: string) { return new Where(this, predicate); }
     
     join(other: Mini, predicate: string) { return new Join(this, other, predicate); }
     
@@ -34,6 +26,10 @@ export default class Mini {
         }
     }
     
+    protected getSelectFrom() {
+        return "select " + this.fields.join(",") + " from ";
+    }
+    
     toString() {
         return this.toSqlString(0, { tables: 0 });
     }
@@ -44,7 +40,7 @@ export class Select extends Mini {
     
     toSqlString(depth: number, context: { tables: number }) {
         return this.wrapTable(
-            "select " + this.fields.join(",") + " from " + this.inner.toSqlString(depth + 1, context), depth, context);
+             this.getSelectFrom() + this.inner.toSqlString(depth + 1, context), depth, context);
     }
 }
 
@@ -52,7 +48,7 @@ export class Where extends Mini {
     constructor(inner: Mini, public predicate: string) { super(inner, inner.fields); }
     toSqlString(depth: number, context: { tables: number }) {
         return this.wrapTable(
-            "select " + this.fields.join(",") + " from " + this.inner.toSqlString(depth + 1, context) +
+            this.getSelectFrom() + this.inner.toSqlString(depth + 1, context) +
             " where " + this.predicate, depth, context);
     }
 }
@@ -61,7 +57,7 @@ export class Join extends Mini {
     constructor(inner: Mini, private other: Mini, private predicate: string) { super(inner, inner.fields.concat(other.fields)); }
     toSqlString(depth: number, context: { tables: number }) {
         return this.wrapTable(
-            "select " + this.fields.join(",") + " from " + this.inner.toSqlString(depth + 1, context) +
+            this.getSelectFrom() + this.inner.toSqlString(depth + 1, context) +
             " join " + this.other.toSqlString(depth + 1, context) + " on " + this.predicate, depth, context);
     }
 }
@@ -69,7 +65,7 @@ export class Join extends Mini {
 export class Table extends Mini {
     constructor(private tableName: string, fields: string[]) { super(null, fields); }
     toSqlString(depth: number, context: { tables: number }) {
-        return this.wrapTable("select " + this.fields.join(",") + " from " + this.tableName, depth, context);
+        return this.wrapTable(this.getSelectFrom() + this.tableName, depth, context);
     }
 }
 
