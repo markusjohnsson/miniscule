@@ -3,10 +3,13 @@ var __extends = (this && this.__extends) || function (d, b) {
     function __() { this.constructor = d; }
     d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
 };
+var esprima = require('esprima');
 var Mini = (function () {
-    function Mini(inner, fieldType) {
+    function Mini(inner, fieldType, fieldsMapping) {
+        if (fieldsMapping === void 0) { fieldsMapping = null; }
         this.inner = inner;
         this.fieldType = fieldType;
+        this.fieldsMapping = fieldsMapping;
     }
     Mini.from = function (table) { return new Table(table); };
     Mini.prototype.select = function (selector) { return new Select(this, selector); };
@@ -17,8 +20,13 @@ var Mini = (function () {
     Mini.prototype.toSqlString = function (depth, context) {
         return "not implemented";
     };
-    Mini.prototype.getTableId = function (context) {
-        return "t" + (context.tables++);
+    Mini.getTableId = function (table, context) {
+        var idx = context.tables.indexOf(table);
+        if (idx == -1) {
+            idx = context.tables.length;
+            context.tables.push(table);
+        }
+        return "t" + idx;
     };
     Mini.prototype.wrapTable = function (str, depth, context) {
         if (depth == 0)
@@ -26,7 +34,7 @@ var Mini = (function () {
         else {
             for (var indent = ""; indent.length < depth; indent += " ")
                 ;
-            return "\n" + indent + "(" + str + ") " + this.getTableId(context) + "\n" + indent;
+            return "\n" + indent + "(" + str + ") " + Mini.getTableId(this, context) + "\n" + indent;
         }
     };
     Mini.prototype.getResultTypeInstance = function () {
@@ -35,31 +43,69 @@ var Mini = (function () {
         else
             return this.fieldType;
     };
-    Mini.prototype.getSelectFrom = function () {
+    Mini.prototype.getFields = function () {
+        if (this.fieldsMapping)
+            return this.fieldsMapping;
         var fields = [];
         var resultInstance = this.getResultTypeInstance();
         for (var prop in resultInstance)
-            fields.push(prop);
-        return "select " + fields.join(",") + " from ";
+            fields.push({ from: prop });
+        return fields;
+    };
+    Mini.prototype.getSelectFrom = function () {
+        var fields = this.getFields();
+        return "select " + fields.map(function (m) { return m.to ? m.from + " as " + m.to : m.from; }).join(",") + " from ";
     };
     Mini.prototype.toString = function () {
-        return this.toSqlString(0, { tables: 0 });
+        return this.toSqlString(0, { tables: [] });
     };
     return Mini;
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.default = Mini;
+function assert(assertion, message) {
+    if (!assertion)
+        throw new Error(message);
+}
+function cast(expression, expressionTypeName) {
+    assert(expression.type == expressionTypeName, "Unexpected expression type " + expression.type + ", expected " + expressionTypeName);
+    return expression;
+}
 var Select = (function (_super) {
     __extends(Select, _super);
     function Select(inner, selector) {
-        _super.call(this, inner, Select.getType(inner, selector));
+        _super.call(this, inner, Select.getType(inner, selector), Select.getFieldsMapping(inner, selector));
     }
     Select.getType = function (inner, selector) {
         var m = inner.getResultTypeInstance();
         var r = selector(m);
-        if (r.constructor == Object)
-            return r;
-        return r.constructor;
+        switch (typeof r) {
+            case 'object':
+                if (r.constructor == Object)
+                    return r;
+                else
+                    return r.constructor;
+            case 'number':
+            case 'string':
+            case 'boolean':
+                throw new Error(".select(): values must be wrapped in objects, e.g. `row => ({ value: row.value })`");
+        }
+        throw new Error(".select(): cannot get type from selector");
+    };
+    Select.getFieldsMapping = function (inner, selector) {
+        var ast = reflect.getAst(selector);
+        var arg = reflect.getArgs(selector)[0];
+        var getPath = function (e) {
+            var obj = cast(e.object, 'Identifier');
+            var prop = cast(e.property, 'Identifier');
+            assert(obj.name == arg, "Unknown root " + obj.name);
+            return prop.name;
+        };
+        var obj = cast(ast, 'ObjectExpression');
+        return obj.properties.map(function (p) { return ({
+            from: getPath(cast(p.value, 'MemberExpression')),
+            to: cast(p.key, 'Identifier').name
+        }); });
     };
     Select.prototype.toSqlString = function (depth, context) {
         return this.wrapTable(this.getSelectFrom() + this.inner.toSqlString(depth + 1, context), depth, context);
@@ -100,8 +146,10 @@ var Join = (function (_super) {
     Join.prototype.toSqlString = function (depth, context) {
         var inner = reflect.getProperty(this.innerKeySelector);
         var other = reflect.getProperty(this.otherKeySelector);
+        var innerId = Mini.getTableId(this.inner, context);
+        var outerId = Mini.getTableId(this.outer, context);
         return this.wrapTable(this.getSelectFrom() + this.inner.toSqlString(depth + 1, context) +
-            " join " + this.outer.toSqlString(depth + 1, context) + " on " + inner + " = " + other, depth, context);
+            " join " + this.outer.toSqlString(depth + 1, context) + " on " + innerId + "." + inner + " = " + outerId + "." + other, depth, context);
     };
     return Join;
 })(Mini);
@@ -112,10 +160,29 @@ var reflect;
     reflect.getProperty = function (f) {
         var str = f.toString();
         var m = str.match(propRegex);
-        console.log(str);
         if (m.length != 2)
             throw new Error("Unable to parse single property");
         return m[1];
+    };
+    reflect.getAst = function (func) {
+        var es = esprima.parse("(" + func.toString() + ")");
+        var ftn = es.body[0].expression;
+        var body;
+        if (ftn.body.type == "BlockStatement") {
+            var block = ftn.body;
+            if (block.body.length != 1 || block.body[0].type != "ReturnStatement")
+                throw "Function must only contain a single return statement.";
+            body = block.body[0].argument;
+        }
+        else {
+            body = ftn.body;
+        }
+        return body;
+    };
+    reflect.getArgs = function (func) {
+        var es = esprima.parse("(" + func.toString() + ")");
+        var ftn = es.body[0].expression;
+        return ftn.params.map(function (p) { return p.name; });
     };
 })(reflect || (reflect = {}));
 var Table = (function (_super) {
