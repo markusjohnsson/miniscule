@@ -63,14 +63,6 @@ var Mini = (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.default = Mini;
-function assert(assertion, message) {
-    if (!assertion)
-        throw new Error(message);
-}
-function cast(expression, expressionTypeName) {
-    assert(expression.type == expressionTypeName, "Unexpected expression type " + expression.type + ", expected " + expressionTypeName);
-    return expression;
-}
 var Select = (function (_super) {
     __extends(Select, _super);
     function Select(inner, selector) {
@@ -154,6 +146,27 @@ var Join = (function (_super) {
     return Join;
 })(Mini);
 exports.Join = Join;
+var Table = (function (_super) {
+    __extends(Table, _super);
+    function Table(tableType) {
+        _super.call(this, null, tableType);
+        this.tableType = tableType;
+    }
+    Table.prototype.toSqlString = function (depth, context) {
+        var tableName = this.tableType.name;
+        return this.wrapTable(this.getSelectFrom() + tableName, depth, context);
+    };
+    return Table;
+})(Mini);
+exports.Table = Table;
+function assert(assertion, message) {
+    if (!assertion)
+        throw new Error(message);
+}
+function cast(expression, expressionTypeName) {
+    assert(expression.type == expressionTypeName, "Unexpected expression type " + expression.type + ", expected " + expressionTypeName);
+    return expression;
+}
 var reflect;
 (function (reflect) {
     var propRegex = /return [a-zA-Z0-9_]+.([a-zA-Z0-9_]*);/;
@@ -185,16 +198,3 @@ var reflect;
         return ftn.params.map(function (p) { return p.name; });
     };
 })(reflect || (reflect = {}));
-var Table = (function (_super) {
-    __extends(Table, _super);
-    function Table(tableType) {
-        _super.call(this, null, tableType);
-        this.tableType = tableType;
-    }
-    Table.prototype.toSqlString = function (depth, context) {
-        var tableName = this.tableType.name;
-        return this.wrapTable(this.getSelectFrom() + tableName, depth, context);
-    };
-    return Table;
-})(Mini);
-exports.Table = Table;

@@ -5,6 +5,8 @@ export interface Type<T> {
     new (): T;
 }
 
+interface IEmitContext { tables: Mini<any>[] }
+
 export default class Mini<T> {
     constructor(public inner: Mini<any>, public fieldType: Type<T> | T, public fieldsMapping: { from: string; to: string; }[] = null) { }
 
@@ -69,20 +71,6 @@ export default class Mini<T> {
     toString() {
         return this.toSqlString(0, { tables: [] });
     }
-}
-
-
-interface IEmitContext { tables: Mini<any>[] }
-
-function assert(assertion: boolean, message: string) {
-    if (! assertion)
-        throw new Error(message);
-}
-
-function cast<T extends ESTree.Expression>(expression: ESTree.Expression, expressionTypeName: string): T {
-    assert(expression.type == expressionTypeName, `Unexpected expression type ${expression.type}, expected ${expressionTypeName}`) 
-    
-    return <T>expression;
 }
 
 export class Select<T, TResult> extends Mini<TResult> {
@@ -179,6 +167,26 @@ export class Join<T1, T2, TKey, TResult> extends Mini<TResult> {
     }
 }
 
+
+export class Table<T> extends Mini<T> {
+    constructor(private tableType: Type<T>) { super(null, tableType); }
+    toSqlString(depth: number, context: IEmitContext) {
+        let tableName = (<any>this.tableType).name;
+        return this.wrapTable(this.getSelectFrom() + tableName, depth, context);
+    }
+}
+
+function assert(assertion: boolean, message: string) {
+    if (! assertion)
+        throw new Error(message);
+}
+
+function cast<T extends ESTree.Expression>(expression: ESTree.Expression, expressionTypeName: string): T {
+    assert(expression.type == expressionTypeName, `Unexpected expression type ${expression.type}, expected ${expressionTypeName}`) 
+    
+    return <T>expression;
+}
+
 module reflect {
     let propRegex = /return [a-zA-Z0-9_]+.([a-zA-Z0-9_]*);/;
 
@@ -220,13 +228,3 @@ module reflect {
     }
     
 }
-
-
-export class Table<T> extends Mini<T> {
-    constructor(private tableType: Type<T>) { super(null, tableType); }
-    toSqlString(depth: number, context: IEmitContext) {
-        let tableName = (<any>this.tableType).name;
-        return this.wrapTable(this.getSelectFrom() + tableName, depth, context);
-    }
-}
-
