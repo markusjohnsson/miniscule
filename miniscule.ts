@@ -14,7 +14,7 @@ export default class Mini<T> {
 
     select<TResult>(selector: (t: T) => TResult) { return new Select<T, TResult>(this, selector); }
 
-    where(predicate: string) { return new Where<T>(this, predicate); }
+    where(predicate: (t: T) => boolean) { return new Where<T>(this, predicate); }
 
     join<T2, TKey, TResult>(
         other: Mini<T2>,
@@ -37,12 +37,12 @@ export default class Mini<T> {
         return "t" + idx;
     }
 
-    protected wrapTable(str: string, depth: number, context: IEmitContext) {
+    protected wrapTable(str: string, depth: number, context: IEmitContext, noParens: boolean = false) {
         if (depth == 0)
             return str;
         else {
             for (var indent = ""; indent.length < depth; indent += " ");
-            return "\n" + indent + "(" + str + ") " + Mini.getTableId(this, context) + "\n" + indent;
+            return "\n" + indent + (noParens?"":"(") + str + (noParens?" ":") ") + Mini.getTableId(this, context) + "\n" + indent;
         }
     }
 
@@ -127,12 +127,48 @@ export class Select<T, TResult> extends Mini<TResult> {
 }
 
 export class Where<T> extends Mini<T> {
-    constructor(inner: Mini<T>, public predicate: string) { super(inner, inner.fieldType); }
+    constructor(inner: Mini<T>, public predicate: (t: T) => boolean) { super(inner, inner.fieldType); }
 
     toSqlString(depth: number, context: IEmitContext) {
+        
+        let ast = reflect.getAst(this.predicate);
+        let arg = reflect.getArgs(this.predicate)[0];
+        
+        let mapOperator = (op: string) => {
+            switch (op) {
+                case '===': return '=';
+                case '==': return '=';
+                case '!=': return '<>';
+                case '<': return '<';
+                case '>': return '>';
+                case '&&': return 'and';
+                case '||': return 'or';
+            }
+            throw new Error("operator not supported: " + op);
+        }
+        
+        let format = (exp: ESTree.Expression) => {
+            switch (exp.type) {
+                case 'Identifier':
+                    return (<ESTree.Identifier>exp).name;
+                case 'MemberExpression':
+                    let obj = cast<ESTree.Identifier>((<ESTree.MemberExpression>exp).object, 'Identifier');
+                    assert(obj.name == arg, "Unknown root " + obj.name);
+                    return format((<ESTree.MemberExpression>exp).property);
+                case 'BinaryExpression':
+                    let be = <ESTree.BinaryExpression>exp;
+                    return `(${format(be.left)} ${mapOperator(be.operator)} ${format(be.right)})`;
+                case 'Literal':
+                    let literal = <ESTree.Literal>exp;
+                    return literal.value;
+                default:
+                    throw new Error("expression not supported: " + exp.type);
+            }
+        }
+        
         return this.wrapTable(
             this.getSelectFrom() + this.inner.toSqlString(depth + 1, context) +
-            " where " + this.predicate, depth, context);
+            " where " + format(ast), depth, context);
     }
 }
 
@@ -161,15 +197,32 @@ export class Join<T1, T2, TKey, TResult> extends Mini<TResult> {
         let other = reflect.getProperty(this.otherKeySelector);
         let innerId = Mini.getTableId(this.inner, context);
         let outerId = Mini.getTableId(this.outer, context);
+        
+        let innerSql =  (this.inner instanceof Table)  ? 
+            (<Table<any>>this.inner).toSqlName(depth + 1, context) :
+            this.inner.toSqlString(depth + 1, context);
+        
+        let outerSql =  (this.outer instanceof Table)  ? 
+            (<Table<any>>this.outer).toSqlName(depth + 1, context) :
+            this.outer.toSqlString(depth + 1, context);
+        
         return this.wrapTable(
-            this.getSelectFrom() + this.inner.toSqlString(depth + 1, context) +
-            " join " + this.outer.toSqlString(depth + 1, context) + " on " + innerId + "." + inner + " = " + outerId + "." + other, depth, context);
+            this.getSelectFrom() + innerSql +
+            " join " + outerSql + 
+            " on " + innerId + "." + inner + " = " + outerId + "." + other, 
+            depth, context);
     }
 }
 
 
 export class Table<T> extends Mini<T> {
-    constructor(private tableType: Type<T>) { super(null, tableType); }
+    constructor(public tableType: Type<T>) { super(null, tableType); }
+    
+    toSqlName(depth: number, context: IEmitContext){
+        let tableName = (<any>this.tableType).name;
+        return this.wrapTable(tableName, depth, context, true);
+    }
+    
     toSqlString(depth: number, context: IEmitContext) {
         let tableName = (<any>this.tableType).name;
         return this.wrapTable(this.getSelectFrom() + tableName, depth, context);

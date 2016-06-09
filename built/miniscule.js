@@ -28,13 +28,14 @@ var Mini = (function () {
         }
         return "t" + idx;
     };
-    Mini.prototype.wrapTable = function (str, depth, context) {
+    Mini.prototype.wrapTable = function (str, depth, context, noParens) {
+        if (noParens === void 0) { noParens = false; }
         if (depth == 0)
             return str;
         else {
             for (var indent = ""; indent.length < depth; indent += " ")
                 ;
-            return "\n" + indent + "(" + str + ") " + Mini.getTableId(this, context) + "\n" + indent;
+            return "\n" + indent + (noParens ? "" : "(") + str + (noParens ? " " : ") ") + Mini.getTableId(this, context) + "\n" + indent;
         }
     };
     Mini.prototype.getResultTypeInstance = function () {
@@ -112,8 +113,40 @@ var Where = (function (_super) {
         this.predicate = predicate;
     }
     Where.prototype.toSqlString = function (depth, context) {
+        var ast = reflect.getAst(this.predicate);
+        var arg = reflect.getArgs(this.predicate)[0];
+        var mapOperator = function (op) {
+            switch (op) {
+                case '===': return '=';
+                case '==': return '=';
+                case '!=': return '<>';
+                case '<': return '<';
+                case '>': return '>';
+                case '&&': return 'and';
+                case '||': return 'or';
+            }
+            throw new Error("operator not supported: " + op);
+        };
+        var format = function (exp) {
+            switch (exp.type) {
+                case 'Identifier':
+                    return exp.name;
+                case 'MemberExpression':
+                    var obj = cast(exp.object, 'Identifier');
+                    assert(obj.name == arg, "Unknown root " + obj.name);
+                    return format(exp.property);
+                case 'BinaryExpression':
+                    var be = exp;
+                    return "(" + format(be.left) + " " + mapOperator(be.operator) + " " + format(be.right) + ")";
+                case 'Literal':
+                    var literal = exp;
+                    return literal.value;
+                default:
+                    throw new Error("expression not supported: " + exp.type);
+            }
+        };
         return this.wrapTable(this.getSelectFrom() + this.inner.toSqlString(depth + 1, context) +
-            " where " + this.predicate, depth, context);
+            " where " + format(ast), depth, context);
     };
     return Where;
 })(Mini);
@@ -140,8 +173,15 @@ var Join = (function (_super) {
         var other = reflect.getProperty(this.otherKeySelector);
         var innerId = Mini.getTableId(this.inner, context);
         var outerId = Mini.getTableId(this.outer, context);
-        return this.wrapTable(this.getSelectFrom() + this.inner.toSqlString(depth + 1, context) +
-            " join " + this.outer.toSqlString(depth + 1, context) + " on " + innerId + "." + inner + " = " + outerId + "." + other, depth, context);
+        var innerSql = (this.inner instanceof Table) ?
+            this.inner.toSqlName(depth + 1, context) :
+            this.inner.toSqlString(depth + 1, context);
+        var outerSql = (this.outer instanceof Table) ?
+            this.outer.toSqlName(depth + 1, context) :
+            this.outer.toSqlString(depth + 1, context);
+        return this.wrapTable(this.getSelectFrom() + innerSql +
+            " join " + outerSql +
+            " on " + innerId + "." + inner + " = " + outerId + "." + other, depth, context);
     };
     return Join;
 })(Mini);
@@ -152,6 +192,10 @@ var Table = (function (_super) {
         _super.call(this, null, tableType);
         this.tableType = tableType;
     }
+    Table.prototype.toSqlName = function (depth, context) {
+        var tableName = this.tableType.name;
+        return this.wrapTable(tableName, depth, context, true);
+    };
     Table.prototype.toSqlString = function (depth, context) {
         var tableName = this.tableType.name;
         return this.wrapTable(this.getSelectFrom() + tableName, depth, context);

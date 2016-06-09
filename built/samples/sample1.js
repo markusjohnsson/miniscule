@@ -19,7 +19,7 @@ console.log(miniscule_1.default.from(shipaddress).select(function (a) { return (
 console.log(miniscule_1.default
     .from(shipaddress)
     .join(miniscule_1.default.from(address), function (s) { return s.address_id; }, function (s) { return s.address_id; }, function (s, a) { return ({ ship_id: s.ship_id, prefix: a.prefix }); })
-    .where("ship_id > 123")
-    .where("ship_id < 500")
+    .where(function (s) { return s.ship_id > 123; })
+    .where(function (s) { return s.ship_id < 500; })
     .select(function (s) { return ({ myPrefix: s.prefix, myShipId: s.ship_id }); })
     .toString());

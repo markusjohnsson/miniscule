@@ -20,11 +20,11 @@ console.log(Mini
     .from(shipaddress)
     .join(
         Mini.from(address), 
-        s => s.address_id,
+        s => s.address_id, 
         s => s.address_id, 
         (s, a) => ({ ship_id: s.ship_id, prefix: a.prefix }))
-    .where("ship_id > 123")
-    .where("ship_id < 500")
+    .where(s => s.ship_id > 123)
+    .where(s => s.ship_id < 500)
     .select(s => ({ myPrefix: s.prefix, myShipId: s.ship_id }))
     .toString())
     ;
