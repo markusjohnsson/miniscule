@@ -103,7 +103,6 @@ var Select = (function (_super) {
     };
     return Select;
 })(Mini);
-exports.Select = Select;
 var Where = (function (_super) {
     __extends(Where, _super);
     function Where(inner, predicate) {
@@ -148,7 +147,6 @@ var Where = (function (_super) {
     };
     return Where;
 })(Mini);
-exports.Where = Where;
 var Join = (function (_super) {
     __extends(Join, _super);
     function Join(inner, outer, innerKeySelector, otherKeySelector, selector) {
@@ -201,7 +199,6 @@ var Join = (function (_super) {
     };
     return Join;
 })(Mini);
-exports.Join = Join;
 var Table = (function (_super) {
     __extends(Table, _super);
     function Table(tableType) {
@@ -218,7 +215,6 @@ var Table = (function (_super) {
     };
     return Table;
 })(Mini);
-exports.Table = Table;
 function assert(assertion, message) {
     if (!assertion)
         throw new Error(message);

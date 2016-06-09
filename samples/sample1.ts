@@ -19,7 +19,7 @@ console.log(Mini.from(shipaddress).select(a => ({ address_id: a.address_id})).to
 console.log(Mini
     .from(shipaddress)
     .join(
-        Mini.from(address), 
+        Mini.from(address).where(p => p.address_id < 500), 
         s => s.address_id, 
         s => s.address_id, 
         (s, a) => ({ myShip: s.ship_id, thatPrefix: a.prefix }))

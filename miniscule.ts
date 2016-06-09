@@ -10,17 +10,17 @@ interface IEmitContext { tables: Mini<any>[] }
 export default class Mini<T> {
     constructor(public inner: Mini<any>, public fieldType: Type<T> | T) { }
 
-    static from<T>(table: Type<T>) { return new Table<T>(table); }
+    static from<T>(table: Type<T>): Mini<T> { return new Table<T>(table); }
 
-    select<TResult>(selector: (t: T) => TResult) { return new Select<T, TResult>(this, selector); }
+    select<TResult>(selector: (t: T) => TResult): Mini<TResult> { return new Select<T, TResult>(this, selector); }
 
-    where(predicate: (t: T) => boolean) { return new Where<T>(this, predicate); }
+    where(predicate: (t: T) => boolean): Mini<T> { return new Where<T>(this, predicate); }
 
     join<T2, TKey, TResult>(
         other: Mini<T2>,
         innerKeySelector: (t: T) => TKey,
         otherKeySelector: (t: T2) => TKey,
-        selector: (t: T, t2: T2) => TResult) {
+        selector: (t: T, t2: T2) => TResult): Mini<TResult> {
         return new Join<T, T2, TKey, TResult>(this, other, innerKeySelector, otherKeySelector, selector);
     }
 
@@ -71,7 +71,7 @@ export default class Mini<T> {
     }
 }
 
-export class Select<T, TResult> extends Mini<TResult> {
+class Select<T, TResult> extends Mini<TResult> {
 
     private static getType<T, TResult>(inner: Mini<T>, selector: (t: T) => TResult): Type<TResult> | TResult {
         let m = inner.getResultTypeInstance();
@@ -125,7 +125,7 @@ export class Select<T, TResult> extends Mini<TResult> {
     }
 }
 
-export class Where<T> extends Mini<T> {
+class Where<T> extends Mini<T> {
     constructor(inner: Mini<T>, public predicate: (t: T) => boolean) { super(inner, inner.fieldType); }
 
     toSqlString(depth: number, context: IEmitContext) {
@@ -171,7 +171,7 @@ export class Where<T> extends Mini<T> {
     }
 }
 
-export class Join<T1, T2, TKey, TResult> extends Mini<TResult> {
+class Join<T1, T2, TKey, TResult> extends Mini<TResult> {
 
     private static getType<T1, T2, TResult>(inner: Mini<T1>, outer: Mini<T2>, selector: (t1: T1, t2: T2) => TResult): Type<TResult> | TResult {
         let i = inner.getResultTypeInstance();
@@ -236,7 +236,7 @@ export class Join<T1, T2, TKey, TResult> extends Mini<TResult> {
 }
 
 
-export class Table<T> extends Mini<T> {
+class Table<T> extends Mini<T> {
     constructor(public tableType: Type<T>) { super(null, tableType); }
     
     toSqlName(depth: number, context: IEmitContext){
