@@ -8,7 +8,7 @@ export interface Type<T> {
 interface IEmitContext { tables: Mini<any>[] }
 
 export default class Mini<T> {
-    constructor(public inner: Mini<any>, public fieldType: Type<T> | T, public fieldsMapping: { from: string; to: string; }[] = null) { }
+    constructor(public inner: Mini<any>, public fieldType: Type<T> | T) { }
 
     static from<T>(table: Type<T>) { return new Table<T>(table); }
 
@@ -53,9 +53,7 @@ export default class Mini<T> {
             return <T>this.fieldType;
     }
 
-    protected getFields() {
-        if (this.fieldsMapping)
-            return this.fieldsMapping;
+    protected getFields(context: IEmitContext) {
         let fields = [];
         let resultInstance = this.getResultTypeInstance();
         for (let prop in resultInstance)
@@ -63,9 +61,9 @@ export default class Mini<T> {
         return fields;
     }
 
-    protected getSelectFrom() {
-        let fields = this.getFields();
-        return `select ${fields.map(m => m.to ? `${m.from} as ${m.to}` : m.from).join(",")} from `;
+    protected getSelectFrom(context: IEmitContext) {
+        let fields = this.getFields(context);
+        return `select ${fields.map(m => m.to ? `${m.from} as ${m.to}` : m.from).join(", ")} from `;
     }
 
     toString() {
@@ -96,8 +94,9 @@ export class Select<T, TResult> extends Mini<TResult> {
         throw new Error(".select(): cannot get type from selector");
     }
 
-    private static getFieldsMapping<T, TResult>(inner: Mini<T>, selector: (t: T) => TResult): { from: string; to: string }[] {
+    protected getFields(context: IEmitContext): { from: string; to: string }[] {
         
+        let selector = this.selector;
         let ast = reflect.getAst(selector);
         let arg = reflect.getArgs(selector)[0];
         
@@ -116,13 +115,13 @@ export class Select<T, TResult> extends Mini<TResult> {
             }) );
     }
 
-    constructor(inner: Mini<T>, selector: (t: T) => TResult) {
-        super(inner, Select.getType(inner, selector), Select.getFieldsMapping(inner, selector));
+    constructor(inner: Mini<T>, private selector: (t: T) => TResult) {
+        super(inner, Select.getType(inner, selector));
     }
 
     toSqlString(depth: number, context: IEmitContext) {
         return this.wrapTable(
-            this.getSelectFrom() + this.inner.toSqlString(depth + 1, context), depth, context);
+            this.getSelectFrom(context) + this.inner.toSqlString(depth + 1, context), depth, context);
     }
 }
 
@@ -167,7 +166,7 @@ export class Where<T> extends Mini<T> {
         }
         
         return this.wrapTable(
-            this.getSelectFrom() + this.inner.toSqlString(depth + 1, context) +
+            this.getSelectFrom(context) + this.inner.toSqlString(depth + 1, context) +
             " where " + format(ast), depth, context);
     }
 }
@@ -181,6 +180,28 @@ export class Join<T1, T2, TKey, TResult> extends Mini<TResult> {
         if (r.constructor == Object)
             return r;
         return <Type<TResult>>r.constructor;
+    }
+
+    protected getFields(context: IEmitContext): { from: string; to: string }[] {
+        
+        let selector = this.selector;
+        let ast = reflect.getAst(selector);
+        let args = reflect.getArgs(selector);
+        
+        let getPath = (e: ESTree.MemberExpression) => {
+            let obj = cast<ESTree.Identifier>(e.object, 'Identifier');
+            let prop = cast<ESTree.Identifier>(e.property, 'Identifier');
+            assert(obj.name == args[0] || obj.name == args[1], "Unknown root " + obj.name);
+            let host = (obj.name == args[0]) ? Mini.getTableId(this.inner, context) : Mini.getTableId(this.outer, context);
+            return host + "." + prop.name;
+        }
+        
+        let obj = cast<ESTree.ObjectExpression>(ast, 'ObjectExpression');
+        return obj.properties.map(
+            p => ({ 
+                from: getPath(cast<ESTree.MemberExpression>(p.value, 'MemberExpression')),
+                to: cast<ESTree.Identifier>(p.key, 'Identifier').name 
+            }) );
     }
 
     constructor(
@@ -207,7 +228,7 @@ export class Join<T1, T2, TKey, TResult> extends Mini<TResult> {
             this.outer.toSqlString(depth + 1, context);
         
         return this.wrapTable(
-            this.getSelectFrom() + innerSql +
+            this.getSelectFrom(context) + innerSql +
             " join " + outerSql + 
             " on " + innerId + "." + inner + " = " + outerId + "." + other, 
             depth, context);
@@ -225,7 +246,7 @@ export class Table<T> extends Mini<T> {
     
     toSqlString(depth: number, context: IEmitContext) {
         let tableName = (<any>this.tableType).name;
-        return this.wrapTable(this.getSelectFrom() + tableName, depth, context);
+        return this.wrapTable(this.getSelectFrom(context) + tableName, depth, context);
     }
 }
 

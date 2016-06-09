@@ -22,9 +22,9 @@ console.log(Mini
         Mini.from(address), 
         s => s.address_id, 
         s => s.address_id, 
-        (s, a) => ({ ship_id: s.ship_id, prefix: a.prefix }))
-    .where(s => s.ship_id > 123)
-    .where(s => s.ship_id < 500)
-    .select(s => ({ myPrefix: s.prefix, myShipId: s.ship_id }))
+        (s, a) => ({ myShip: s.ship_id, thatPrefix: a.prefix }))
+    .where(s => s.myShip > 123)
+    .where(s => s.myShip < 500)
+    .select(s => ({ myPrefix: s.thatPrefix, myShipId: s.myShip }))
     .toString())
     ;

@@ -5,11 +5,9 @@ var __extends = (this && this.__extends) || function (d, b) {
 };
 var esprima = require('esprima');
 var Mini = (function () {
-    function Mini(inner, fieldType, fieldsMapping) {
-        if (fieldsMapping === void 0) { fieldsMapping = null; }
+    function Mini(inner, fieldType) {
         this.inner = inner;
         this.fieldType = fieldType;
-        this.fieldsMapping = fieldsMapping;
     }
     Mini.from = function (table) { return new Table(table); };
     Mini.prototype.select = function (selector) { return new Select(this, selector); };
@@ -44,18 +42,16 @@ var Mini = (function () {
         else
             return this.fieldType;
     };
-    Mini.prototype.getFields = function () {
-        if (this.fieldsMapping)
-            return this.fieldsMapping;
+    Mini.prototype.getFields = function (context) {
         var fields = [];
         var resultInstance = this.getResultTypeInstance();
         for (var prop in resultInstance)
             fields.push({ from: prop });
         return fields;
     };
-    Mini.prototype.getSelectFrom = function () {
-        var fields = this.getFields();
-        return "select " + fields.map(function (m) { return m.to ? m.from + " as " + m.to : m.from; }).join(",") + " from ";
+    Mini.prototype.getSelectFrom = function (context) {
+        var fields = this.getFields(context);
+        return "select " + fields.map(function (m) { return m.to ? m.from + " as " + m.to : m.from; }).join(", ") + " from ";
     };
     Mini.prototype.toString = function () {
         return this.toSqlString(0, { tables: [] });
@@ -67,7 +63,8 @@ exports.default = Mini;
 var Select = (function (_super) {
     __extends(Select, _super);
     function Select(inner, selector) {
-        _super.call(this, inner, Select.getType(inner, selector), Select.getFieldsMapping(inner, selector));
+        _super.call(this, inner, Select.getType(inner, selector));
+        this.selector = selector;
     }
     Select.getType = function (inner, selector) {
         var m = inner.getResultTypeInstance();
@@ -85,7 +82,8 @@ var Select = (function (_super) {
         }
         throw new Error(".select(): cannot get type from selector");
     };
-    Select.getFieldsMapping = function (inner, selector) {
+    Select.prototype.getFields = function (context) {
+        var selector = this.selector;
         var ast = reflect.getAst(selector);
         var arg = reflect.getArgs(selector)[0];
         var getPath = function (e) {
@@ -101,7 +99,7 @@ var Select = (function (_super) {
         }); });
     };
     Select.prototype.toSqlString = function (depth, context) {
-        return this.wrapTable(this.getSelectFrom() + this.inner.toSqlString(depth + 1, context), depth, context);
+        return this.wrapTable(this.getSelectFrom(context) + this.inner.toSqlString(depth + 1, context), depth, context);
     };
     return Select;
 })(Mini);
@@ -145,7 +143,7 @@ var Where = (function (_super) {
                     throw new Error("expression not supported: " + exp.type);
             }
         };
-        return this.wrapTable(this.getSelectFrom() + this.inner.toSqlString(depth + 1, context) +
+        return this.wrapTable(this.getSelectFrom(context) + this.inner.toSqlString(depth + 1, context) +
             " where " + format(ast), depth, context);
     };
     return Where;
@@ -168,6 +166,24 @@ var Join = (function (_super) {
             return r;
         return r.constructor;
     };
+    Join.prototype.getFields = function (context) {
+        var _this = this;
+        var selector = this.selector;
+        var ast = reflect.getAst(selector);
+        var args = reflect.getArgs(selector);
+        var getPath = function (e) {
+            var obj = cast(e.object, 'Identifier');
+            var prop = cast(e.property, 'Identifier');
+            assert(obj.name == args[0] || obj.name == args[1], "Unknown root " + obj.name);
+            var host = (obj.name == args[0]) ? Mini.getTableId(_this.inner, context) : Mini.getTableId(_this.outer, context);
+            return host + "." + prop.name;
+        };
+        var obj = cast(ast, 'ObjectExpression');
+        return obj.properties.map(function (p) { return ({
+            from: getPath(cast(p.value, 'MemberExpression')),
+            to: cast(p.key, 'Identifier').name
+        }); });
+    };
     Join.prototype.toSqlString = function (depth, context) {
         var inner = reflect.getProperty(this.innerKeySelector);
         var other = reflect.getProperty(this.otherKeySelector);
@@ -179,7 +195,7 @@ var Join = (function (_super) {
         var outerSql = (this.outer instanceof Table) ?
             this.outer.toSqlName(depth + 1, context) :
             this.outer.toSqlString(depth + 1, context);
-        return this.wrapTable(this.getSelectFrom() + innerSql +
+        return this.wrapTable(this.getSelectFrom(context) + innerSql +
             " join " + outerSql +
             " on " + innerId + "." + inner + " = " + outerId + "." + other, depth, context);
     };
@@ -198,7 +214,7 @@ var Table = (function (_super) {
     };
     Table.prototype.toSqlString = function (depth, context) {
         var tableName = this.tableType.name;
-        return this.wrapTable(this.getSelectFrom() + tableName, depth, context);
+        return this.wrapTable(this.getSelectFrom(context) + tableName, depth, context);
     };
     return Table;
 })(Mini);
