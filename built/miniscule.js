@@ -1,3 +1,4 @@
+"use strict";
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
     function __() { this.constructor = d; }
@@ -57,7 +58,7 @@ var Mini = (function () {
         return this.toSqlString(0, { tables: [] });
     };
     return Mini;
-})();
+}());
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.default = Mini;
 var Select = (function (_super) {
@@ -102,7 +103,7 @@ var Select = (function (_super) {
         return this.wrapTable(this.getSelectFrom(context) + this.inner.toSqlString(depth + 1, context), depth, context);
     };
     return Select;
-})(Mini);
+}(Mini));
 var Where = (function (_super) {
     __extends(Where, _super);
     function Where(inner, predicate) {
@@ -146,7 +147,7 @@ var Where = (function (_super) {
             " where " + format(ast), depth, context);
     };
     return Where;
-})(Mini);
+}(Mini));
 var Join = (function (_super) {
     __extends(Join, _super);
     function Join(inner, outer, innerKeySelector, otherKeySelector, selector) {
@@ -198,7 +199,7 @@ var Join = (function (_super) {
             " on " + innerId + "." + inner + " = " + outerId + "." + other, depth, context);
     };
     return Join;
-})(Mini);
+}(Mini));
 var Table = (function (_super) {
     __extends(Table, _super);
     function Table(tableType) {
@@ -214,7 +215,7 @@ var Table = (function (_super) {
         return this.wrapTable(this.getSelectFrom(context) + tableName, depth, context);
     };
     return Table;
-})(Mini);
+}(Mini));
 function assert(assertion, message) {
     if (!assertion)
         throw new Error(message);

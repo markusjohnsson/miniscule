@@ -1,15 +1,21 @@
+miniscule
+=========
 
+Strongly typed SQL-generation for typescript.
+
+Example:
+
+```
 import Mini from "../miniscule"; 
 
 class department {
     department_id: number = 0; 
-    name: string = null;
+    name: string;
 }
 
 class user {
     user_id: number;
     department_id: number;
-    name: string = null;
     email: string = null;
 }
 
@@ -19,12 +25,12 @@ console.log(Mini
         Mini.from(user),
         department => department.department_id,
         user => user.department_id,
-        (department, user) => ({
-            user: user.user_id, 
-            name: user.name, 
+        (department, user) => ({ 
+            departmentId: department.department_id, 
             email: user.email,
-            departmentId: department.department_id,
             departmentName : department.name
         }))
     .toString())
     ;
+
+```
