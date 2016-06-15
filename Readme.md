@@ -1,11 +1,11 @@
 miniscule
 =========
 
-Strongly typed SQL-generation for typescript.
+Strongly typed, fluent style SQL query builder for TypeScript
 
 Example:
 
-```
+```typescript
 import Mini from "../miniscule"; 
 
 class department {
