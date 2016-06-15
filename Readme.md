@@ -6,6 +6,14 @@ Strongly typed, fluent style SQL query builder for TypeScript
 Example:
 
 ```typescript
+miniscule
+=========
+
+Strongly typed, fluent style SQL query builder for TypeScript
+
+Example:
+
+```
 import Mini from "../miniscule"; 
 
 class department {
@@ -32,5 +40,7 @@ console.log(Mini
         }))
     .toString())
     ;
+
+```
 
 ```
