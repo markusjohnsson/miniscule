@@ -16,7 +16,16 @@ var user = (function () {
 }());
 console.log(miniscule_1.default.from(department).toString());
 // select department_id, name from department
-console.log(miniscule_1.default.from(department).where(function (d) { return d.name == "IT"; }).toString());
+console.log(miniscule_1.default
+    .from(department)
+    .select(function (d) { return ({ name: d.name }); })
+    .toString());
+// select name as name from 
+//  (select department_id, name from department) t0
+console.log(miniscule_1.default
+    .from(department)
+    .where(function (d) { return d.name == "IT"; })
+    .toString());
 // select department_id, name from 
 //  (select department_id, name from department) t0
 //   where (name = IT)

@@ -16,7 +16,18 @@ class user {
 console.log(Mini.from(department).toString());
 // select department_id, name from department
 
-console.log(Mini.from(department).where(d => d.name == "IT").toString());
+
+console.log(Mini
+    .from(department)
+    .select(d => ({ name: d.name }))
+    .toString());
+// select name as name from 
+//  (select department_id, name from department) t0
+
+console.log(Mini
+    .from(department)
+    .where(d => d.name == "IT")
+    .toString());
 // select department_id, name from 
 //  (select department_id, name from department) t0
 //   where (name = IT)
